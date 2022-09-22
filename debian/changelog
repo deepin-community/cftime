@@ -1,0 +1,210 @@
+cftime (1.5.1+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Bump Standards-Version to 4.6.0, no changes.
+  * Bump debhelper compat to 12, changes:
+    - Drop --list-missing from dh_install
+  * Drop spelling-errors.patch, applied upstream.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Sat, 25 Sep 2021 06:26:30 +0200
+
+cftime (1.5.0+ds-1) unstable; urgency=medium
+
+  * Move from experimental to unstable.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Sun, 15 Aug 2021 09:53:22 +0200
+
+cftime (1.5.0+ds-1~exp1) experimental; urgency=medium
+
+  [ Bas Couwenberg ]
+  * New upstream release.
+  * Update watch file for GitHub URL changes.
+  * Add patch to fix spelling errors.
+
+  [Helmut Grohne]
+  * Annotate test dependencies <!nocheck>.
+    (closes: #982583)
+
+ -- Bas Couwenberg <sebastic@debian.org>  Fri, 21 May 2021 06:27:21 +0200
+
+cftime (1.4.1+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Tue, 02 Feb 2021 06:14:57 +0100
+
+cftime (1.4.0rel2+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Update copyright file for license change to MIT.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Mon, 01 Feb 2021 05:48:54 +0100
+
+cftime (1.3.1+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Update lintian overrides.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Sun, 17 Jan 2021 19:54:26 +0100
+
+cftime (1.3.0+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Bump watch file version to 4.
+  * Update lintian overrides.
+  * Bump Standards-Version to 4.5.1, no changes.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Wed, 23 Dec 2020 05:56:08 +0100
+
+cftime (1.2.1+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Add lintian override for file-references-package-build-path.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Mon, 20 Jul 2020 05:45:21 +0200
+
+cftime (1.2.0+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Mon, 06 Jul 2020 05:42:54 +0200
+
+cftime (1.1.3+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Thu, 14 May 2020 06:04:57 +0200
+
+cftime (1.1.2+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Mon, 20 Apr 2020 19:30:40 +0200
+
+cftime (1.1.1.2+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Tue, 24 Mar 2020 05:44:23 +0100
+
+cftime (1.1.1.1+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Bump debhelper compat to 10, changes:
+    - Drop --parallel option, enabled by default
+
+ -- Bas Couwenberg <sebastic@debian.org>  Thu, 19 Mar 2020 21:27:58 +0100
+
+cftime (1.1.1+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Mon, 16 Mar 2020 05:44:48 +0100
+
+cftime (1.1.0+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Drop Name field from upstream metadata.
+  * Bump Standards-Version to 4.5.0, no changes.
+  * Repack upstream tarball to exclude pre-built documentation.
+  * Reinstate coverage support.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Fri, 14 Feb 2020 06:57:51 +0100
+
+cftime (1.0.4.2-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Thu, 24 Oct 2019 06:28:13 +0200
+
+cftime (1.0.4-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Bump Standards-Version to 4.4.1, no changes.
+  * Drop unused override for file-references-package-build-path.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Tue, 22 Oct 2019 06:14:33 +0200
+
+cftime (1.0.3.4-3) unstable; urgency=medium
+
+  * Drop Python 2 support.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Tue, 20 Aug 2019 21:19:47 +0200
+
+cftime (1.0.3.4-2) unstable; urgency=medium
+
+  * Bump Standards-Version to 4.4.0, no changes.
+  * Update dh_install override to use --list-missing.
+  * Add lintian overrides for file-references-package-build-path.
+  * Update gbp.conf to use --source-only-changes by default.
+  * Disable coverage support, pytest-cov not updated for pytest 4 yet.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Wed, 07 Aug 2019 19:01:49 +0200
+
+cftime (1.0.3.4-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Drop patches, applied/included upstream.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Thu, 06 Dec 2018 09:42:17 +0100
+
+cftime (1.0.3-2) unstable; urgency=medium
+
+  * Add upstream patch to fix FTBFS on 32bit architectures.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Sun, 02 Dec 2018 18:19:52 +0100
+
+cftime (1.0.3-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Add patch to not cythonize in the clean target.
+  * Add build dependencies for coverage.
+  * Don't include .coverage files in binary packages.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Sun, 02 Dec 2018 10:48:57 +0100
+
+cftime (1.0.2.1-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Drop patches, included upstream.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Sat, 27 Oct 2018 19:06:44 +0200
+
+cftime (1.0.2-2) unstable; urgency=medium
+
+  * Add upstream patches to fix FTBFS on 32bit architectures.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Sat, 27 Oct 2018 16:05:26 +0200
+
+cftime (1.0.2-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Bump Standards-Version to 4.2.1, no changes.
+  * Update copyright file to include GPL-3+ for calcalcs code.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Sat, 27 Oct 2018 10:03:04 +0200
+
+cftime (1.0.1-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Bump Standards-Version to 4.2.0, no changes.
+  * Drop autopkgtests to test installability & module import.
+  * Add lintian override for testsuite-autopkgtest-missing.
+  * Update watch file to limit matches to archive path.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Thu, 16 Aug 2018 07:05:28 +0200
+
+cftime (1.0.0-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Drop ancient X-Python-version field.
+  * Strip trailing whitespace from control & rules.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Thu, 17 May 2018 07:06:15 +0200
+
+cftime (1.0.0~b1-1) unstable; urgency=medium
+
+  * Initial release (Closes: #897400).
+    Python 2 version required for python-netcdf4.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Wed, 02 May 2018 13:37:47 +0200
