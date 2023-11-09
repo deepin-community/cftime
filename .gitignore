@@ -1,1 +1,10 @@
-.pc/
+*.so
+*.py[co]
+*.c
+build/
+*.egg?
+*.egg-info
+__pycache__
+.pytest_cache/
+dist/
+docs/_build/*

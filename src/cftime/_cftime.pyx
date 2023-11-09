@@ -8,12 +8,11 @@ from numpy cimport int64_t, int32_t
 import cython
 import numpy as np
 import re
-import sys
 import time
 from datetime import datetime as datetime_python
 from datetime import timedelta, MINYEAR, MAXYEAR
-import time                     # strftime
 import warnings
+from ._strptime import _strptime
 
 microsec_units = ['microseconds','microsecond', 'microsec', 'microsecs']
 millisec_units = ['milliseconds', 'millisecond', 'millisec', 'millisecs', 'msec', 'msecs', 'ms']
@@ -38,7 +37,7 @@ cdef int[12] _dayspermonth_leap = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 3
 cdef int[13] _cumdayspermonth = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365]
 cdef int[13] _cumdayspermonth_leap = [0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366]
 
-__version__ = '1.5.1'
+__version__ = '1.6.3'
 
 # Adapted from http://delete.me.uk/2005/03/iso8601.html
 # Note: This regex ensures that all ISO8601 timezone formats are accepted - but, due to legacy support for other timestrings, not all incorrect formats can be rejected.
@@ -101,7 +100,11 @@ def _dateparse(timestr,calendar,has_year_zero=None):
             raise ValueError("'%s' units only allowed for '365_day' and 'noleap' calendars" % units) 
         else:
             raise ValueError(
-            "units must be one of 'seconds', 'minutes', 'hours' or 'days' (or singular version of these), got '%s'" % units)
+            "In general, units must be one of 'microseconds', 'milliseconds', "
+            "'seconds', 'minutes', 'hours', or 'days' (or select abbreviated "
+            "versions of these).  For the '360_day' calendar, "
+            "'months' can also be used, or for the 'noleap' calendar 'common_years' "
+            "can also be used. Got '%s' instead, which are not recognized." % units)
     # parse the date string.
     year, month, day, hour, minute, second, microsecond, utc_offset =\
         _parse_date( isostring.strip() )
@@ -122,12 +125,15 @@ def _dateparse(timestr,calendar,has_year_zero=None):
     return basedate
 
 def _can_use_python_datetime(date,calendar):
-    gregorian = datetime(1582,10,15,calendar=calendar,has_year_zero=date.has_year_zero)
-    return ((calendar == 'proleptic_gregorian' and date.year >= MINYEAR and date.year <= MAXYEAR) or \
-           (calendar in ['gregorian','standard'] and date > gregorian and date.year <= MAXYEAR))
+    #gregorian = datetime(1582,10,15,calendar=calendar,has_year_zero=date.has_year_zero)
+    #return ((calendar == 'proleptic_gregorian' and date.year >= MINYEAR and date.year <= MAXYEAR) or \
+    #       (calendar in ['gregorian','standard'] and date > gregorian and date.year <= MAXYEAR))
+    return  (calendar == 'proleptic_gregorian' and date.year >= MINYEAR and date.year <= MAXYEAR) or \
+            ((calendar in ['gregorian','standard'] and date.year <= MAXYEAR) and (date.year > 1582 or \
+            (date.year == 1582 and date.month >= 10 and date.day > 15)))
 
 @cython.embedsignature(True)
-def date2num(dates,units,calendar=None,has_year_zero=None):
+def date2num(dates, units, calendar=None, has_year_zero=None, longdouble=False):
     """
     Return numeric time values given datetime objects. The units
     of the numeric time values are described by the **units** argument
@@ -172,6 +178,12 @@ def date2num(dates,units,calendar=None,has_year_zero=None):
     This kwarg is not needed to define calendar systems allowed by CF
     (the calendar-specific defaults do this).
 
+    **longdouble**: If set True, output is in the long double float type
+    (numpy.float128) instead of float (numpy.float64), allowing microsecond
+    accuracy when converting a time value to a date and back again. Otherwise
+    this is only possible if the discretization of the time variable is an
+    integer multiple of the units.
+
     returns a numeric time value, or an array of numeric time values
     with approximately 1 microsecond accuracy.
     """
@@ -215,7 +227,7 @@ def date2num(dates,units,calendar=None,has_year_zero=None):
             has_year_zero = _year_zero_defaults(calendar)
 
     # if calendar is None or '', use calendar of first input cftime.datetime instances.
-    # if inputs are 'real' python datetime instances, use propleptic gregorian.
+    # if inputs are 'real' python datetime instances, use proleptic gregorian.
     if not calendar:
         if all_python_datetimes:
             calendar = 'proleptic_gregorian'
@@ -254,8 +266,12 @@ def date2num(dates,units,calendar=None,has_year_zero=None):
         use_python_datetime = False
         # convert basedate to specified calendar
         basedate =  to_calendar_specific_datetime(basedate, calendar, False, has_year_zero=has_year_zero)
-    times = []; n = 0
-    for date in dates.flat:
+    times = []
+    for n, date in enumerate(dates.flat):
+        if ismasked and mask.flat[n]:
+            times.append(None)
+            continue
+
         # use python datetime if possible.
         if use_python_datetime:
             # remove time zone offset
@@ -263,20 +279,35 @@ def date2num(dates,units,calendar=None,has_year_zero=None):
                 date = date.replace(tzinfo=None) - date.utcoffset()
         else: # convert date to same calendar specific cftime.datetime instance
             date = to_calendar_specific_datetime(date, calendar, False, has_year_zero=has_year_zero)
-        if ismasked and mask.flat[n]:
-            times.append(None)
+
+        td = date - basedate
+        if td % unit_timedelta == timedelta(0):
+            # Explicitly cast result to np.int64 for Windows compatibility
+            quotient = np.int64(td // unit_timedelta)
+            times.append(quotient)
         else:
-            td = date - basedate
-            if td % unit_timedelta == timedelta(0):
-                # Explicitly cast result to np.int64 for Windows compatibility
-                quotient = np.int64(td // unit_timedelta)
-                times.append(quotient)
+            if longdouble:
+                # Division of timedelta's is in float64 precision,
+                # i.e. losing microsecond precision.
+                # Conversion to float128 helps but can still lead to imprecision
+                # of +-1 microsecond in division:
+                #   quotient = (np.longdouble(td.total_seconds()) /
+                #               np.longdouble(unit_timedelta.total_seconds()))
+                # -> Convert to (64-bit) integers of microseconds
+                mtd = (td.days * 86400000000 +
+                       td.seconds * 1000000 +
+                       td.microseconds)
+                munit = (unit_timedelta.days * 86400000000 +
+                         unit_timedelta.seconds * 1000000 +
+                         unit_timedelta.microseconds)
+                quotient = np.longdouble(mtd) / np.longdouble(munit)
             else:
-                times.append(td / unit_timedelta)
-        n += 1
+                quotient = td / unit_timedelta
+            times.append(quotient)
+
     if ismasked: # convert to masked array if input was masked array
-        times = np.array(times)
-        times = np.ma.masked_where(times==None,times)
+        times = np.array(times, dtype=float)  # None -> nan
+        times = np.ma.masked_invalid(times)
         if isscalar:
             return times[0]
         else:
@@ -287,8 +318,9 @@ def date2num(dates,units,calendar=None,has_year_zero=None):
         return np.reshape(np.array(times), shape)
 
 
+@cython.embedsignature(True)
 def num2pydate(times,units,calendar='standard'):
-    """num2pydate(times,units,calendar='standard')
+    """
     Always returns python datetime.datetime
     objects and raise an error if this is not possible.
 
@@ -376,7 +408,9 @@ def cast_to_int(num, units=None):
     if num.dtype.kind in "iu":
         return num
     else:
-        if np.any(num < _MIN_INT64) or np.any(num > _MAX_INT64):
+        #if np.any(num < _MIN_INT64) or np.any(num > _MAX_INT64):
+        # use this instead to avoid test failures on windows with numpy 1.23.0 (issue #279)
+        if np.any(np.less(num,_MIN_INT64,casting='same_kind')) or np.any(np.greater(num,_MAX_INT64,casting='same_kind')):
             raise OverflowError('time values outside range of 64 bit signed integers')
         if isinstance(num, np.ma.core.MaskedArray):
             int_num = np.ma.masked_array(np.rint(num), dtype=np.int64)
@@ -412,6 +446,8 @@ def scale_times(num, factor):
     if num.dtype.kind == "f":
         return factor * num
     else:
+        if num.size == 0: # empty array (issue #287)
+            return num
         # Python integers have arbitrary precision, so convert min and max
         # returned by NumPy functions through item, prior to multiplying by
         # factor.
@@ -422,6 +458,52 @@ def scale_times(num, factor):
             raise OverflowError('time values outside range of 64 bit signed integers')
         else:
             return num * factor
+
+
+def decode_date_from_scalar(time_in_microseconds, basedate):
+    """Decode a date from a scalar input."""
+    delta = time_in_microseconds.astype("timedelta64[us]").astype(timedelta)
+    try:
+        return basedate + delta
+    except OverflowError:
+        raise ValueError("OverflowError in datetime, possibly because year < datetime.MINYEAR")
+
+
+def decode_dates_from_array(times_in_microseconds, basedate):
+    """Decode values encoded by an integer array in units of microseconds to dates.
+    
+    This is an optimized algorithm that operates by flattening and sorting the input
+    array of integers, decoding the first date using the original base date, and then
+    incrementally adding timedeltas to decode the rest of the dates in the array.  This
+    is an optimal approach, because it minimizes the length of the timedeltas used in
+    each addition operation required to decode the times (timedelta addition is the rate
+    limiting step in the process).  The original order of the elements and shape of the
+    array are restored at the end.  The sorting and unsorting steps add only a small
+    overhead.  See discussion and timing results in GitHub issue 269.
+    """
+    original_shape = times_in_microseconds.shape
+    times_in_microseconds = times_in_microseconds.ravel()
+
+    sort_indices = np.argsort(times_in_microseconds)
+    unsort_indices = np.argsort(sort_indices)
+    times_in_microseconds = times_in_microseconds[sort_indices]
+
+    # We first cast to the np.timedelta64[us] dtype out of convenience, but ultimately
+    # cast to datetime.timedelta objects for operations with cftime objects (we cannot
+    # cast from integers to datetime.timedelta objects directly).
+    deltas = times_in_microseconds.astype("timedelta64[us]")
+    differential_deltas = np.diff(deltas).astype(timedelta)
+
+    dates = np.empty(times_in_microseconds.shape, dtype="O")
+    try:
+        dates[0] = basedate + deltas[0].astype(timedelta)
+        for i in range(len(differential_deltas)):
+            dates[i + 1] = dates[i] + differential_deltas[i]
+    except OverflowError:
+        raise ValueError("OverflowError in datetime, possibly because year < datetime.MINYEAR")
+
+    return dates[unsort_indices].reshape(original_shape)
+
 
 @cython.embedsignature(True)
 def num2date(
@@ -534,14 +616,18 @@ def num2date(
     scaled_times = scale_times(times, factor)
     scaled_times = cast_to_int(scaled_times,units=unit)
 
-    # Through np.timedelta64, convert integers scaled to have units of
-    # microseconds to datetime.timedelta objects, the timedelta type compatible
-    # with all cftime.datetime objects.
-    deltas = scaled_times.astype("timedelta64[us]").astype(timedelta)
-    try:
-        return basedate + deltas
-    except OverflowError:
-        raise ValueError("OverflowError in datetime, possibly because year < datetime.MINYEAR")
+    if scaled_times.ndim == 0 or scaled_times.size == 0:
+        return decode_date_from_scalar(scaled_times, basedate)
+    else:
+        if isinstance(scaled_times, np.ma.MaskedArray):
+            # The algorithm requires data be present for all values. To handle this, we fill 
+            # masked values with 0 temporarily and then restore the mask at the end.
+            original_mask = np.ma.getmask(scaled_times)
+            scaled_times = scaled_times.filled(0)
+            dates = decode_dates_from_array(scaled_times, basedate)
+            return np.ma.MaskedArray(dates, mask=original_mask)
+        else:
+            return decode_dates_from_array(scaled_times, basedate)
 
 
 @cython.embedsignature(True)
@@ -611,7 +697,7 @@ def date2index(dates, nctime, calendar=None, select='exact', has_year_zero=None)
             has_year_zero = _year_zero_defaults(calendar)
 
     # if calendar is None or '', use calendar of first input cftime.datetime instances.
-    # if inputs are 'real' python datetime instances, use propleptic gregorian.
+    # if inputs are 'real' python datetime instances, use proleptic gregorian.
     if not calendar:
         d0 = dates_test.item(0)
         if isinstance(d0,datetime_python):
@@ -838,6 +924,20 @@ def time2index(times, nctime, calendar=None, select='exact'):
     if calendar == None:
         calendar = getattr(nctime, 'calendar', 'standard')
 
+    if select != 'exact':
+        # if select works, then 'nearest' == 'exact', 'before' == 'exact'-1 and
+        # 'after' == 'exact'+1
+        try:
+            index = time2index(times, nctime, calendar=calendar, select='exact')
+            if select == 'nearest':
+                return index
+            elif select == 'before':
+                return index-1
+            else:
+                return index+1
+        except ValueError:
+            pass
+
     num = np.atleast_1d(times)
     N = len(nctime)
 
@@ -918,7 +1018,7 @@ cdef _toscalar(a):
     else:
         return a
 
-cdef to_tuple(dt):
+def to_tuple(dt):
     """Turn a datetime.datetime instance into a tuple of integers. Elements go
     in the order of decreasing significance, making it easy to compare
     datetime instances. Parts of the state that don't affect ordering
@@ -951,7 +1051,7 @@ This class mimics datetime.datetime but support calendars other than the prolept
 Gregorian calendar.
 
 Supports timedelta operations by overloading +/-, and
-comparisons with other instances using the same calendar.
+comparisons with other instances (even if they use different calendars).
 
 Comparison with native python datetime instances is possible
 for cftime.datetime instances using
@@ -1050,7 +1150,7 @@ The default format of the string produced by strftime is controlled by self.form
         if calendar == 'gregorian' or calendar == 'standard':
             # dates after 1582-10-15 can be converted to and compared to
             # proleptic Gregorian dates
-            self.calendar = 'gregorian'
+            self.calendar = 'standard'
             if self.to_tuple() >= (1582, 10, 15, 0, 0, 0, 0):
                 self.datetime_compatible = True
             else:
@@ -1139,6 +1239,48 @@ The default format of the string produced by strftime is controlled by self.form
             format = self.format
         return _strftime(self, format)
 
+    @staticmethod
+    def strptime(datestring, format, calendar='standard', has_year_zero=None):
+        """
+        Return a datetime corresponding to date_string, parsed according to format,
+        with a specified calendar and year zero convention.
+        The format directives 'y','Y','m','B','b','d','H','M','S' and 'f'
+        are supported for all calendars and dates.  If the date is valid
+        in the python 'proleptic_gregorian' calendar, then python's
+        datetime.strptime is used. For a complete list of formatting directives
+        supported in python's datetime.strptime, see section
+        'strftime() and strptime() Behavior' in the base Python documentation.
+        """
+        # if possible use python's datetime.strptime to get a python datetime instance
+        # (works for dates in proleptic_gregorian calendar)
+        fd = [d[0] for d in format.split('%') if d] # extract format descriptors
+        # calendar specific format descriptors that won't work will all calendars
+        special_fd = ['a', 'A', 'w', 'j', 'U', 'W', 'G', 'u', 'V']
+        try:
+            pydatetime = datetime_python.strptime(datestring, format)
+            # remove time zone offset
+            if getattr(pydatetime, 'tzinfo',None) is not None:
+                 pydatetime = pydatetime.replace(tzinfo=None) - pydatetime.utcoffset()
+            compatible_date =\
+            calendar == 'proleptic_gregorian' or \
+            (calendar in ['gregorian','standard'] and (pydatetime.year > 1582 or \
+             (pydatetime.year == 1582 and pydatetime.month > 10) or \
+             (pydatetime.year == 1582 and pydatetime.month == 10 and pydatetime.day > 15)))
+            if not compatible_date and any(x in special_fd for x in fd):
+                msg='one of the supplied format directives may not be consistent with the chosen calendar'
+                raise KeyError(msg)
+            # convert the cftime datetime instance
+            return datetime(pydatetime.year, pydatetime.month, pydatetime.day,
+                            pydatetime.hour, pydatetime.minute, pydatetime.second,
+                            pydatetime.microsecond, calendar=calendar, has_year_zero=has_year_zero)
+        # otherwise use a stripped-down version of C-python's _strptime.py
+        # (doesn't understand all possible formats, just
+        # 'y','Y','m','B','b','d','H','M','S' and 'f')
+        except ValueError:
+            year,month,day,hour,minute,second,microsecond = _strptime(datestring,format)
+            return datetime(year,month,day,hour,minute,second,microsecond,
+                            calendar=calendar,has_year_zero=has_year_zero)
+
     def __format__(self, format):
         # the string format "{t_obj}".format(t_obj=t_obj)
         # without an explicit format gives an empty string (format='')
@@ -1211,25 +1353,43 @@ The default format of the string produced by strftime is controlled by self.form
     def __str__(self):
         return self.isoformat(' ')
 
-    def isoformat(self,sep='T',timespec='auto'):
-        second = ":%02i" %self.second
-        if (timespec == 'auto' and self.microsecond) or timespec == 'microseconds':
-            second += ".%06i" % self.microsecond
-        if timespec == 'milliseconds':
-            millisecs = self.microsecond/1000
-            second += ".%03i" % millisecs
-        if timespec in ['auto', 'microseconds', 'milliseconds']:
-            return "%04i-%02i-%02i%s%02i:%02i%s" %\
-            (self.year, self.month, self.day, sep, self.hour, self.minute, second)
-        elif timespec == 'seconds':
-            return "%04i-%02i-%02i%s%02i:%02i:%02i" %\
-            (self.year, self.month, self.day, sep, self.hour, self.minute, self.second)
-        elif timespec == 'minutes':
-            return "%04i-%02i-%02i%s%02i:%02i" %\
-            (self.year, self.month, self.day, sep, self.hour, self.minute)
+    def isoformat(self, sep='T', timespec='auto'):
+        """
+        ISO date representation
+
+        """
+        if self.year < 0:
+            form0 = '{:05d}-{:02d}-{:02d}'
+        else:
+            form0 = '{:04d}-{:02d}-{:02d}'
+        if timespec == 'days':
+            form = form0
+            return form.format(self.year, self.month, self.day)
         elif timespec == 'hours':
-            return "%04i-%02i-%02i%s%02i" %\
-            (self.year, self.month, self.day, sep, self.hour)
+            form = form0 + '{:s}{:02d}'
+            return form.format(self.year, self.month, self.day, sep,
+                               self.hour)
+        elif timespec == 'minutes':
+            form = form0 + '{:s}{:02d}:{:02d}'
+            return form.format(self.year, self.month, self.day, sep,
+                               self.hour, self.minute)
+        elif timespec == 'seconds':
+            form = form0 + '{:s}{:02d}:{:02d}:{:02d}'
+            return form.format(self.year, self.month, self.day, sep,
+                               self.hour, self.minute, self.second)
+        elif timespec in ['auto', 'microseconds', 'milliseconds']:
+            second = '{:02d}'.format(self.second)
+            if timespec == 'milliseconds':
+                millisecs = int(round(self.microsecond / 1000, 0))
+                second += '.{:03d}'.format(millisecs)
+            elif timespec == 'microseconds':
+                second += '.{:06d}'.format(self.microsecond)
+            else:
+                if self.microsecond > 0:
+                    second += '.{:06d}'.format(self.microsecond)
+            form = form0 + '{:s}{:02d}:{:02d}:{:s}'
+            return form.format(self.year, self.month, self.day, sep,
+                               self.hour, self.minute, second)
         else:
             raise ValueError('illegal timespec')
 
@@ -1394,7 +1554,7 @@ The default format of the string produced by strftime is controlled by self.form
         elif calendar == 'julian':
             #return dt.__class__(*add_timedelta(dt, delta, is_leap_julian, False, has_year_zero),calendar=calendar,has_year_zero=has_year_zero)
             return DatetimeJulian(*add_timedelta(dt, delta, is_leap_julian, False, has_year_zero),has_year_zero=has_year_zero)
-        elif calendar == 'gregorian':
+        elif calendar == 'standard':
             #return dt.__class__(*add_timedelta(dt, delta, is_leap_gregorian, True, has_year_zero),calendar=calendar,has_year_zero=has_year_zero)
             return DatetimeGregorian(*add_timedelta(dt, delta, is_leap_gregorian, True, has_year_zero),has_year_zero=has_year_zero)
         elif calendar == 'proleptic_gregorian':
@@ -1452,7 +1612,7 @@ datetime object."""
                     #return self.__class__(*add_timedelta(self, -other, 
                     #     is_leap_julian, False, has_year_zero),calendar=self.calendar,has_year_zero=self.has_year_zero)
                     return DatetimeJulian(*add_timedelta(self, -other, is_leap_julian, False, has_year_zero),has_year_zero=self.has_year_zero)
-                elif self.calendar == 'gregorian':
+                elif self.calendar == 'standard':
                     #return self.__class__(*add_timedelta(self, -other, 
                     #     is_leap_gregorian, True, has_year_zero),calendar=self.calendar,has_year_zero=self.has_year_zero)
                     return DatetimeGregorian(*add_timedelta(self, -other, is_leap_gregorian, True, has_year_zero),has_year_zero=self.has_year_zero)
@@ -1496,14 +1656,24 @@ cdef _findall(text, substr):
 # Every 28 years the calendar repeats, except through century leap
 # years where it's 6 years.  But only if you're using the Gregorian
 # calendar.  ;)
-
-
+# Make also 4-digit negative years
+# Allow .%f for microseconds
 cdef _strftime(datetime dt, fmt):
     if _illegal_s.search(fmt):
         raise TypeError("This strftime implementation does not handle %s")
     # don't use strftime method at all.
     # if dt.year > 1900:
     #    return dt.strftime(fmt)
+    if '%f' in fmt:
+        if not fmt.endswith('.%f'):
+            raise TypeError('If %f is used for microseconds it must be the'
+                            ' at the end as .%f')
+        else:
+            ihavems = True
+            fmt1 = fmt[:-3]
+    else:
+        ihavems = False
+        fmt1 = fmt
 
     year = dt.year
     # For every non-leap year century, advance by
@@ -1515,10 +1685,10 @@ cdef _strftime(datetime dt, fmt):
     # Move to around the year 2000
     year = year + ((2000 - year) // 28) * 28
     timetuple = dt.timetuple()
-    s1 = time.strftime(fmt, (year,) + timetuple[1:])
+    s1 = time.strftime(fmt1, (year,) + timetuple[1:])
     sites1 = _findall(s1, str(year))
 
-    s2 = time.strftime(fmt, (year + 28,) + timetuple[1:])
+    s2 = time.strftime(fmt1, (year + 28,) + timetuple[1:])
     sites2 = _findall(s2, str(year + 28))
 
     sites = []
@@ -1527,9 +1697,14 @@ cdef _strftime(datetime dt, fmt):
             sites.append(site)
 
     s = s1
-    syear = "%04d" % (dt.year,)
+    if dt.year < 0:
+        syear = "%05d" % (dt.year,)
+    else:
+        syear = "%04d" % (dt.year,)
     for site in sites:
         s = s[:site] + syear + s[site + 4:]
+    if ihavems:
+        s = s + '.{:06d}'.format(dt.microsecond)
     return s
 
 cdef bint is_leap_julian(int year, bint has_year_zero):
@@ -1724,6 +1899,16 @@ cdef tuple add_timedelta_360_day(datetime dt, delta):
 
     return (year, month, day, hour, minute, second, microsecond, -1, -1)
 
+@cython.embedsignature(True)
+def is_leap_year(year, calendar, has_year_zero=None):
+    """returns `True` if specified year in specified calendar is
+    a leap year. Optional kwarg `has_year_zero`
+    controls whether astronomical year numbering
+    is used and the year zero exists.  If not specified,
+    calendar-specific default is assumed."""
+    # public version of _is_leap (issue #259)
+    return _is_leap(year, calendar, has_year_zero=has_year_zero)
+
 cdef _is_leap(int year, calendar, has_year_zero=None):
     cdef int tyear
     cdef bint leap
@@ -1764,7 +1949,7 @@ cdef _check_calendar(calendar):
         raise ValueError('unsupported calendar')
     calout = calendar
     # remove 'gregorian','noleap','all_leap'
-    if calendar in 'gregorian':
+    if calendar == 'gregorian':
         calout = 'standard'
     if calendar == 'noleap':
         calout = '365_day'
@@ -1922,10 +2107,10 @@ but uses the "julian" calendar.
 cdef class DatetimeGregorian(datetime):
     """
 Phony datetime object which mimics the python datetime object,
-but uses the mixed Julian-Gregorian ("standard", "gregorian") calendar.
+but uses the mixed Julian-Gregorian ("standard") calendar.
     """
     def __init__(self, *args, **kwargs):
-        kwargs['calendar']='gregorian'
+        kwargs['calendar']='standard'
         super().__init__(*args, **kwargs)
 
 @cython.embedsignature(True)

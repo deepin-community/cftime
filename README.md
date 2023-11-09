@@ -12,6 +12,20 @@ Time-handling functionality from netcdf4-python
 ## News
 For details on the latest updates, see the [Changelog](https://github.com/Unidata/cftime/blob/master/Changelog).
 
+10/20/2023:  Version 1.6.3 released.  Support for python 3.12, cython 3.0, strptime formats without separators.
+ 
+9/18/2022:  Version 1.6.2 released.  strptime method added, fix for num2date failure on
+empty integer array, date2num 'longdouble' keyword added. New wheel building workflow.
+
+6/30/2022:  Version 1.6.1 released.  Fixes for numpy 1.23.0, updated CI/CD.
+
+3/4/2022:  Version 1.6.0 released.  Big speed-ups for num2date, date2index bugfix for select != 'exact' when select='exact' works, fix for date2num with masked array inputs.
+
+1/22/2022: Version 1.5.2 released (wheels for Apple M1 available on pypi for python 3.8,3.9 and 3.10). is_leap_year
+function added (issue #259).
+
+10/31/2021: Version 1.5.1.1 released (new binary wheels for python 3.10).
+
 10/1/2021:  Version 1.5.1 released. Changed default behavior of ``proleptic_gregorian``
 to has_year_zero=T (since it is allowed in ISO-8601 and CF does not specify the
 year zero convention for this calendar). Raise warning message when trying

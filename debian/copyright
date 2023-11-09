@@ -2,9 +2,6 @@ Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: cftime
 Upstream-Contact: Jeff Whitaker <jeffrey.s.whitaker@noaa.gov>
 Source: https://github.com/Unidata/cftime
-Comment: Pre-built documentation is excluded from the upstream tarball.
-Files-Excluded:
- docs/_build/*
 
 Files: *
 Copyright: 2008, Jeffrey Whitaker

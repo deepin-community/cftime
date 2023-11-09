@@ -1,7 +1,7 @@
 check-manifest
 coverage
 coveralls
-cython
+cython>=0.29.20
 pytest
 pytest-cov
 sphinx
