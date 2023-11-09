@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import os
 import sys
 import numpy
@@ -16,7 +14,20 @@ except ImportError:
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 SRCDIR = os.path.join(BASEDIR,'src')
 CMDS_NOCYTHONIZE = ['clean','clean_cython','sdist']
-COMPILER_DIRECTIVES = {}
+COMPILER_DIRECTIVES = {
+    # Cython 3.0.0 changes the default of the c_api_binop_methods directive to
+    # False, resulting in errors in datetime and timedelta arithmetic:
+    # https://github.com/Unidata/cftime/issues/271.  We explicitly set it to
+    # True to retain Cython 0.x behavior for future Cython versions.  This
+    # directive was added in Cython version 0.29.20.
+    "c_api_binop_methods": True
+}
+COVERAGE_COMPILER_DIRECTIVES = {
+    "linetrace": True,
+    "warn.maybe_uninitialized": False,
+    "warn.unreachable": False,
+    "warn.unused": False,
+}
 DEFINE_MACROS = [("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")] 
 FLAG_COVERAGE = '--cython-coverage'  # custom flag enabling Cython line tracing
 NAME = 'cftime'
@@ -74,10 +85,9 @@ def description():
 
 if ((FLAG_COVERAGE in sys.argv or os.environ.get('CYTHON_COVERAGE', None))
     and cythonize):
-    COMPILER_DIRECTIVES = {'linetrace': True,
-                           'warn.maybe_uninitialized': False,
-                           'warn.unreachable': False,
-                           'warn.unused': False}
+    COMPILER_DIRECTIVES = {
+        **COMPILER_DIRECTIVES, **COVERAGE_COMPILER_DIRECTIVES
+    }
     DEFINE_MACROS += [('CYTHON_TRACE', '1'),
                      ('CYTHON_TRACE_NOGIL', '1')]
     if FLAG_COVERAGE in sys.argv:
@@ -113,17 +123,19 @@ setup(
     install_requires=load('requirements.txt'),
     tests_require=load('requirements-dev.txt'),
     license='License :: OSI Approved :: MIT License',
+    python_requires=">=3.8",
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: Microsoft :: Windows',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Topic :: Scientific/Engineering',
         'License :: OSI Approved :: MIT License'],
     )

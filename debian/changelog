@@ -1,3 +1,67 @@
+cftime (1.6.3-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Enable numpy3 dh helper.
+  * Bump Standards-Version to 4.6.2, no changes.
+  * Bump debhelper compat to 13.
+  * Use autopkgtest-pkg-pybuild testsuite.
+  * Enable Salsa CI.
+  * Remove generated files in clean.
+    (closes: #1043731)
+  * Use execute_after instead of override in rules files.
+  * Switch to dh-sequence-*.
+  * Drop test_num2date_precision.patch, fixed upstream.
+  * Update lintian overrides.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Fri, 20 Oct 2023 06:27:54 +0200
+
+cftime (1.6.2-3) unstable; urgency=medium
+
+  * Use pybuild-plugin-pyproject instead of python3-setuptools.
+  * Add Rules-Requires-Root to control file.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Thu, 01 Dec 2022 08:25:28 +0100
+
+cftime (1.6.2-2) unstable; urgency=medium
+
+  * Add patch to fix FTBFS on some architectures.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Mon, 19 Sep 2022 13:31:29 +0200
+
+cftime (1.6.2-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Mon, 19 Sep 2022 05:28:47 +0200
+
+cftime (1.6.1-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Bump Standards-Version to 4.6.1, no changes.
+  * Drop repacking, fixed upstream.
+  * Update lintian overrides.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Thu, 30 Jun 2022 16:50:23 +0200
+
+cftime (1.6.0+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Fri, 04 Mar 2022 06:53:59 +0100
+
+cftime (1.5.2+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Sat, 22 Jan 2022 18:36:47 +0100
+
+cftime (1.5.1.1+ds-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Update watch file to use tags instead of releases.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Thu, 20 Jan 2022 05:56:12 +0100
+
 cftime (1.5.1+ds-1) unstable; urgency=medium
 
   * New upstream release.
