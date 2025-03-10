@@ -1,8 +1,16 @@
-cftime (1.6.3-1deepin1) unstable; urgency=medium
+cftime (1.6.4-2) unstable; urgency=medium
 
-  * No source change upload against python 3.12.
+  * Bump Standards-Version to 4.7.0, no changes.
+  * Update watch file to not match post releases.
+  * Update lintian overrides.
 
- -- Tianyu Chen <sweetyfish@deepin.org>  Mon, 08 Jul 2024 09:49:45 +0200
+ -- Bas Couwenberg <sebastic@debian.org>  Thu, 06 Mar 2025 18:31:53 +0100
+
+cftime (1.6.4-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Bas Couwenberg <sebastic@debian.org>  Fri, 07 Jun 2024 06:22:55 +0200
 
 cftime (1.6.3-1) unstable; urgency=medium
 

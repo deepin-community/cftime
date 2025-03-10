@@ -7,12 +7,15 @@ from cpython.object cimport (PyObject_RichCompare, Py_LT, Py_LE, Py_EQ,
 from numpy cimport int64_t, int32_t
 import cython
 import numpy as np
+cimport numpy as np
 import re
 import time
 from datetime import datetime as datetime_python
 from datetime import timedelta, MINYEAR, MAXYEAR
 import warnings
 from ._strptime import _strptime
+
+np.import_array()
 
 microsec_units = ['microseconds','microsecond', 'microsec', 'microsecs']
 millisec_units = ['milliseconds', 'millisecond', 'millisec', 'millisecs', 'msec', 'msecs', 'ms']
@@ -37,7 +40,7 @@ cdef int[12] _dayspermonth_leap = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 3
 cdef int[13] _cumdayspermonth = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365]
 cdef int[13] _cumdayspermonth_leap = [0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366]
 
-__version__ = '1.6.3'
+__version__ = '1.6.4'
 
 # Adapted from http://delete.me.uk/2005/03/iso8601.html
 # Note: This regex ensures that all ISO8601 timezone formats are accepted - but, due to legacy support for other timestrings, not all incorrect formats can be rejected.
@@ -193,7 +196,11 @@ def date2num(dates, units, calendar=None, has_year_zero=None, longdouble=False):
     try:
         dates[0]
     except:
-        isscalar = True
+        if not dates:
+            # if empty list or array input, return empty array (issue #315)
+            return np.array([],dtype=float)
+        else:
+            isscalar = True
 
     # masked array input?
     ismasked = False
@@ -613,6 +620,9 @@ def num2date(
     factor = UNIT_CONVERSION_FACTORS[unit]
     times = np.asanyarray(times)  # Allow list as input
     times = upcast_times(times)
+    # convert to masked array if any nan or inf values present
+    if not np.isfinite(times).all():
+        times = np.ma.masked_invalid(times)
     scaled_times = scale_times(times, factor)
     scaled_times = cast_to_int(scaled_times,units=unit)
 

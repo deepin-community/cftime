@@ -1,3 +1,11 @@
+version 1.6.4 (release tag v1.6.4rel)
+=====================================
+ * build aarch64 linux wheels (issue #333).
+ * build musllinux wheels (issue #307).
+ * return empty array if one provided to date2num (issue #315).
+ * numpy 2.0 compatibility (issue #325).
+ * handle nan/inf in num2date (issue #328).
+
 version 1.6.3 (release tag v1.6.3rel)
 =====================================
  * add support for formats without separators in strptime (e.g. '20200229', issue #301).
